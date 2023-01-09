@@ -1,0 +1,40 @@
+[file ".editorconfig"]
+	url = https://github.com/devlooped/oss/blob/main/.editorconfig
+	sha = 448cf45a26e068fe5d7164ea48d1dc8bf620df46
+	etag = 897634b9ba05c00e8ef35b24533d31bc43a5299be5a64e240109ba4c00fcad15
+	weak
+[file ".gitattributes"]
+	url = https://github.com/devlooped/oss/blob/main/.gitattributes
+	sha = 0683ee777d7d878d4bf013d7deea352685135a05
+	etag = 7acb32f5fa6d4ccd9c824605a7c2b8538497f0068c165567807d393dcf4d6bb7
+	weak
+[file ".gitignore"]
+	url = https://github.com/devlooped/oss/blob/main/.gitignore
+	sha = c78868eba59a3e04602434684f9eac241fef13fb
+	etag = 1c1705a3f0ed65e33c9133996ebaa100aa445a8b968b2904ad48fef938702006
+	weak
+[file "src/Directory.Build.props"]
+	url = https://github.com/devlooped/oss/blob/main/src/Directory.Build.props
+	sha = ef8e7fa7593ded91d871d30eeebd0dc79f679159
+	etag = 1d5ec6bdb8b12c13635a11364dcfe54aefb82cc171f332a8d536aa35476222d5
+	weak
+[file "src/Directory.Build.targets"]
+	url = https://github.com/devlooped/oss/blob/main/src/Directory.Build.targets
+	sha = b9fb0a7d34d6c16fb404f9dff4aac6789ef08a00
+	etag = 852b16129d2c681ad6ec86ff56b256541e0ce0961eb3a9492e0ead89ffe5a6bd
+	weak
+[file "src/nuget.config"]
+	url = https://github.com/devlooped/oss/blob/main/src/nuget.config
+	sha = b2fa09bd9db6de89e37a8ba6705b5659e435dafd
+	etag = eb2d09e546aa1e11c0b464d9ed6ab2d3c028a1d86c3ac40a318053625fb72819
+	weak
+[file ".github/dependabot.yml"]
+	url = https://github.com/devlooped/oss/blob/main/.github/dependabot.yml
+	sha = 4f070a477b4162a280f02722ae666376ae4fcc71
+	etag = 35f2134fff3b0235ff8dac8618a76198c8ef533ad2f29628bbb435cd1134d638
+	weak
+[file ".github/workflows/dotnet-file.yml"]
+	url = https://github.com/devlooped/oss/blob/main/.github/workflows/dotnet-file.yml
+	sha = f08c3f28e46e28eb31e70846d65e57aa9553ce56
+	etag = 567444486383d032c1c5fbc538f07e860f92b1d08c66ac6ffb1db64ca539251c
+	weak
