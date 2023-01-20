@@ -43,5 +43,5 @@ jobs:
 
       - name: 🚀 deploy
         if: github.ref == 'refs/heads/main'
-        working-directory: ./src/Api
+        working-directory: src\App
         run: func azure functionapp publish ${{ secrets.AZURE_APPNAME }} --force --csharp --dotnet-cli-params -- -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
