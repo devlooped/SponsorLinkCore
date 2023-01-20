@@ -1,0 +1,47 @@
+﻿name: build
+on: 
+  workflow_dispatch:
+  push:
+    branches: [ main, 'dev/*', 'feature/*', 'rel/*' ]
+    paths-ignore:
+      - changelog.md
+      - code-of-conduct.md
+      - security.md
+      - support.md
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  DOTNET_NOLOGO: true
+  Configuration: Release
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: 🤘 checkout
+        uses: actions/checkout@v2
+        with: 
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: 🙏 build
+        run: dotnet build -m:1 -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
+
+      - name: ⚙ func 4.x
+        run: npm i -g azure-functions-core-tools@4 --unsafe-perm true  
+
+      - name: 🔓 login
+        if: github.ref == 'refs/heads/main'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 🚀 deploy
+        if: github.ref == 'refs/heads/main'
+        working-directory: ./src/Api
+        run: func azure functionapp publish ${{ secrets.AZURE_APPNAME }} --force --csharp --dotnet-cli-params -- -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
