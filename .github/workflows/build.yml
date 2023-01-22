@@ -32,6 +32,9 @@ jobs:
       - name: 🙏 build
         run: dotnet build -m:1 -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
 
+      - name: 📦 pack
+        run: dotnet pack -m:1 -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
+        
       - name: ⚙ func 4.x
         run: npm i -g azure-functions-core-tools@4 --unsafe-perm true  
 
@@ -45,3 +48,12 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: src\App
         run: func azure functionapp publish ${{ secrets.AZURE_APPNAME }} --force --csharp --dotnet-cli-params -- -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
+
+      - name: 🚀 sleet
+        env:
+          SLEET_CONNECTION: ${{ secrets.SLEET_CONNECTION }}
+        if: env.SLEET_CONNECTION != ''
+        run: |
+          dotnet tool install -g --version 4.0.18 sleet 
+          sleet push bin --config none -f --verbose -p "SLEET_FEED_CONTAINER=nuget" -p "SLEET_FEED_CONNECTIONSTRING=${{ secrets.SLEET_CONNECTION }}" -p "SLEET_FEED_TYPE=azure" || echo "No packages found"
+        
