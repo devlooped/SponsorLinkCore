@@ -39,31 +39,32 @@ Open the GraphQL explorer and sign-in with your GH credentials, then run the fol
 will retrieve your currently active sponsors:
 
 ```graphql
-query { 
-  organization(login: "[YOUR_SPONSOR_LOGIN]") {
-    id
-    login
-    sponsorshipsAsMaintainer(first: 100, orderBy: {field: CREATED_AT, direction: ASC}, includePrivate: true) {
-      nodes {
-        createdAt
-        isOneTimePayment
-        sponsorEntity {
-          ... on Organization {
-            id
-            login
-          }
-          ... on User {
-            id
-            login
-          }
-        }
-        tier {
-          monthlyPriceInDollars
-        }
-      }
-    }
-  }
-}```
+   query { 
+     organization(login: "[SPONSORABLE]") {
+       id
+       login
+       sponsorshipsAsMaintainer(first: 100, orderBy: {field: CREATED_AT, direction: ASC}, includePrivate: true) {
+         nodes {
+           createdAt
+           isOneTimePayment
+           sponsorEntity {
+             ... on Organization {
+               id
+               login
+             }
+             ... on User {
+               id
+               login
+             }
+           }
+           tier {
+             monthlyPriceInDollars
+           }
+         }
+       }
+     }
+   }
+```
 
 > NOTE: Replace `organization(login: ...)` with `user(login: ...)` if your sponsor account is a user rather than 
 > an organization.
