@@ -14,7 +14,7 @@ on:
 env:
   DOTNET_NOLOGO: true
   Configuration: Release
-  VersionLabel: ${{ github.ref }}.${{ github.run_number }}
+  VersionLabel: ${{ github.ref }}
 
 defaults:
   run:
