@@ -14,6 +14,7 @@ on:
 env:
   DOTNET_NOLOGO: true
   Configuration: Release
+  VersionLabel: ${{ github.ref }}.${{ github.run_number }}
 
 defaults:
   run:
@@ -30,10 +31,10 @@ jobs:
           fetch-depth: 0
 
       - name: 🙏 build
-        run: dotnet build -m:1 -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
+        run: dotnet build -m:1
 
       - name: 📦 pack
-        run: dotnet pack -m:1 -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
+        run: dotnet pack -m:1
         
       - name: ⚙ func 4.x
         run: npm i -g azure-functions-core-tools@4 --unsafe-perm true  
@@ -47,7 +48,7 @@ jobs:
       - name: 🚀 deploy
         if: github.ref == 'refs/heads/main'
         working-directory: src\App
-        run: func azure functionapp publish ${{ secrets.AZURE_APPNAME }} --force --csharp --dotnet-cli-params -- -p:VersionLabel="$GITHUB_REF.$GITHUB_RUN_NUMBER"
+        run: func azure functionapp publish ${{ secrets.AZURE_APPNAME }} --force --csharp
 
       - name: 🚀 sleet
         env:
