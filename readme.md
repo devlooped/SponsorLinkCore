@@ -1,5 +1,8 @@
 # SponsorLink
 
+[![Version](https://img.shields.io/nuget/vpre/Devlooped.SponsorLink.svg?color=royalblue)](https://www.nuget.org/packages/Devlooped.SponsorLink)
+[![Downloads](https://img.shields.io/nuget/dt/Devlooped.SponsorLink.svg?color=green)](https://www.nuget.org/packages/Devlooped.SponsorLink)
+
 Required web app settings:
 
 * GitHub:WebhookSecret = [a shared secret initially configured for the webhook of both sponsorlink and admin apps]
