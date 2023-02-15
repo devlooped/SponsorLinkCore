@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NuGetizer" Version="0.9.1" />
+    <PackageReference Include="NuGetizer" Version="0.9.2" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" Pack="false" />
     <PackageReference Include="Obfuscar" Version="2.2.37" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" Pack="false" />
@@ -34,7 +34,8 @@
     <PackageFile Include="*.props;*.targets" PackagePath="buildTransitive/$(TargetFramework)/%(Filename)%(Extension)" />
     <PackageFile Include="lib\net462\System.Net.Http.WinHttpHandler.dll"
                  PackageReference="System.Net.Http.WinHttpHandler"
-                 PackFolder="analyzers/dotnet/roslyn4.0"/>
+                 PackFolder="analyzers/dotnet/roslyn4.0"
+                 Visible="false"/>
   </ItemGroup>
 
   <Target Name="Obfuscate" AfterTargets="Build" DependsOnTargets="Build" Condition="'$(Configuration)' == 'Release' and '$(dotnet-nugetize)' == ''">
