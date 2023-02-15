@@ -33,6 +33,9 @@ jobs:
       - name: 🙏 build
         run: dotnet build -m:1
 
+      - name: 🧪 test
+        run: dotnet test --filter SponsorLink=true
+
       - name: 📦 pack
         run: dotnet pack -m:1
         
