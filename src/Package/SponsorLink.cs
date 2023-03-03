@@ -16,7 +16,14 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
     // We use a smaller timeout since analyzer/generator will run more frequently 
     // so we have more than one chance to get the right status, eventually. 
     // This is 1/4 of the HttpClientFactory default timeout, used for direct API calls.
+#if DEBUG
+    // Debug builds are slower, to give it a full second of timeout
+    static readonly TimeSpan NetworkTimeout = Debugger.IsAttached ? 
+        TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(1);
+#else
     static readonly TimeSpan NetworkTimeout = TimeSpan.FromMilliseconds(250);
+#endif
+
     static readonly HttpClient http;
 
     static readonly Random rnd = new();
@@ -103,6 +110,43 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
     /// </summary>
     void IIncrementalGenerator.Initialize(IncrementalGeneratorInitializationContext context)
     {
+        // A quick non-reporting usage check for telemetry purposes should still happen on every 
+        // build, to get more accurate usage stats.
+        // Only do so for "implementation", which doesn't run on design-time builds.
+        context.RegisterImplementationSourceOutput(context.CompilationProvider.Combine(context.AnalyzerConfigOptionsProvider),
+            (c, x) =>
+            {
+                var (insideEditor, designTimeBuild) = ReadOptions(x.Right.GlobalOptions);
+                // We never report in DTB. This should never happen since we're registering for *Implementation* output.
+                if (designTimeBuild == true)
+                    return;
+
+                // We never report for non-IDE builds
+                if (insideEditor == false)
+                    return;
+
+                // Note that hacked targets, i.e. those without our required props, will still report telemetry, 
+                // since we check for == false, but the value may be null in hacked targets scenario.
+
+                // Ditto here: if the targets were hacked to avoid reporting the project path, we will just try 
+                // the current directory for the check. This is a best-effort scenario.
+                if (!x.Right.GlobalOptions.TryGetValue("build_property.MSBuildProjectFullPath", out var projectPath))
+                    projectPath = Directory.GetCurrentDirectory();
+                else
+                    projectPath = Path.GetDirectoryName(projectPath);
+
+                if (insideEditor == true && designTimeBuild != true) 
+                {
+                    SponsorCheck
+                        .CheckAsync(projectPath, settings.Sponsorable, settings.Product, settings.PackageId, settings.Version, http)
+                        .FireAndForget();
+                }
+            });
+
+        // Full sponsor check, including build pause and custom diagnostics, should not run all the 
+        // time, and instead only runs whenever the main project is (re)built or it has changed. 
+        // That's the only reason we add it as an additional file, so that the automatic incremental 
+        // behavior in the source generator infrastructure itself will do this work for us.
         var analyzerFile = context.AdditionalTextsProvider
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Where(x =>
@@ -119,19 +163,31 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
             })
             .Collect();
 
-        var dirs = context.AdditionalTextsProvider
-            .Combine(context.AnalyzerConfigOptionsProvider)
-            .Where(x =>
-                x.Right.GetOptions(x.Left).TryGetValue("build_metadata.AdditionalFiles.SourceItemType", out var itemType) &&
-                itemType == "MSBuildProject")
+        var dirs = context.AnalyzerConfigOptionsProvider
             .Select((x, c) =>
             {
-                var (insideEditor, designTimeBuild) = ReadOptions(x.Right.GlobalOptions);
-                return new BuildInfo(x.Left.Path, insideEditor, designTimeBuild);
+                var (insideEditor, designTimeBuild) = ReadOptions(x.GlobalOptions);
+                var lastUpdated = DateTime.UtcNow;
+                string? projectFile;
+
+                if (x.GlobalOptions.TryGetValue("build_property.MSBuildProjectFullPath", out projectFile) &&
+                    File.Exists(projectFile))
+                {
+                    lastUpdated = File.GetLastWriteTimeUtc(projectFile);
+                }
+                if (x.GlobalOptions.TryGetValue("build_property.ProjectAssetsFile", out var projectAssetsFile) &&
+                    File.Exists(projectAssetsFile) &&
+                    File.GetLastWriteTimeUtc(projectAssetsFile) is var assetsLastUpdated &&
+                    assetsLastUpdated > lastUpdated)
+                {
+                    lastUpdated = assetsLastUpdated;
+                }
+
+                return new BuildInfo(
+                    lastUpdated.ToString("O").GetHashCode(),
+                    projectFile ?? Path.Combine(Directory.GetCurrentDirectory(), "dummy.csproj"),
+                    insideEditor, designTimeBuild);
             })
-            .Combine(context.CompilationProvider)
-            // Add compilation options to check for warning disable.
-            .Select((x, c) => x.Left.WithCompilationOptions(x.Right.Options))
             // Add our analyzer file path to check for installation time
             .Combine(analyzerFile)
             .Select((x, c) =>
@@ -145,9 +201,25 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
                 // righ-away with the max configured pause. This will happen for example if 
                 // the settings don't provide a package id, or it differs from the product name.
                 return x.Left;
-            });
+            })
+            .WithComparer(BuildInfoComparer.Default);
 
-        context.RegisterSourceOutput(dirs.Collect(), CheckSponsor);
+        context.RegisterSourceOutput(dirs, (ctx, info) =>
+        {
+            Debugger.Launch();
+
+            // Should only be run whenever BuildInfo changes!
+            var diag = CheckSponsor(info, ctx.CancellationToken);
+
+            // No pause will be issued in this case, since no diagnostic was produced.
+            if (diag == null ||
+                !diag.Properties.TryGetValue("Pause", out var value) ||
+                !int.TryParse(value, out var pause))
+                return;
+
+            if (pause != 0)
+                Thread.Sleep(pause);
+        });
     }
 
     /// <summary>
@@ -173,13 +245,14 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
                 if (!warn)
                     return null;
                 
-                var diag = Diagnostic.Create(descriptor, null, product, sponsorable, suffix);
-
+                var diag = Diagnostic.Create(descriptor, null, 
+                    properties: new Dictionary<string, string?>
+                    {
+                        { "Pause", pause.ToString() },
+                    }.ToImmutableDictionary(), 
+                    product, sponsorable, suffix);
+                
                 WriteMessage(sponsorable, product, Path.GetDirectoryName(projectPath), diag);
-
-                if (pause > 0)
-                    Thread.Sleep(pause);
-
                 return diag;
             case DiagnosticKind.Thanks:
                 return WriteMessage(sponsorable, product, Path.GetDirectoryName(projectPath),
@@ -189,26 +262,19 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
         }
     }
 
-    void CheckSponsor(SourceProductionContext context, ImmutableArray<BuildInfo> states)
+    Diagnostic? CheckSponsor(BuildInfo state, CancellationToken cancellation)
     {
-        if (states.IsDefaultOrEmpty || states[0].InsideEditor == null)
-        {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticsManager.Broken, null));
-            return;
-        }
-
-        var state = states[0];
         // Updates the InstallTime setting the first time.
         if (state.InstallTime != null && settings.InstallTime == null)
             settings.InstallTime = state.InstallTime;
 
         // We never pause in DTB
         if (state.DesignTimeBuild == true)
-            return;
+            return default;
 
         // We never pause in non-IDE builds
         if (state.InsideEditor == false)
-            return;
+            return default;
 
         var ev = new ManualResetEventSlim();
         SponsorStatus? status = default;
@@ -222,10 +288,10 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
                 ev.Set();
             });
 
-        ev.Wait(NetworkTimeout, context.CancellationToken);
+        ev.Wait(NetworkTimeout, cancellation);
 
         if (status == null)
-            return;
+            return default;
 
         var kind = status.Value switch
         {
@@ -237,11 +303,13 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
         // If the given kind was already reported, no-op.
         if (Diagnostics.TryPeek(sponsorable, product, state.ProjectPath, out var diagnostic) &&
             diagnostic != null && diagnostic.Descriptor.IsKind(kind))
-            return;
+            return default;
 
         diagnostic = OnDiagnostic(state.ProjectPath, kind);
         if (diagnostic != null)
             Diagnostics.Push(sponsorable, product, state.ProjectPath, diagnostic);
+
+        return diagnostic;
     }
 
     void ReportDiagnostic(CompilationAnalysisContext context)
@@ -397,12 +465,15 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
     /// </summary>
     class BuildInfo
     {
-        internal BuildInfo(string path, bool? insideEditor, bool? designTimeBuild)
+        internal BuildInfo(int equivalenceKey, string path, bool? insideEditor, bool? designTimeBuild)
         {
+            EquivalenceKey = equivalenceKey;
             ProjectPath = path;
             InsideEditor = insideEditor;
             DesignTimeBuild = designTimeBuild;
         }
+
+        public int EquivalenceKey { get; }
 
         /// <summary>
         /// The full path of the project being built.
@@ -416,26 +487,30 @@ public abstract class SponsorLink : DiagnosticAnalyzer, IIncrementalGenerator
         /// Whether the build is a design-time build.
         /// </summary>
         public bool? DesignTimeBuild { get; }
-        /// <summary>
-        /// Compilation options being used for the build.
-        /// </summary>
-        public CompilationOptions? CompilationOptions { get; private set; }
 
         /// <summary>
         /// The installation/restore time of SponsorLink.
         /// </summary>
         public DateTime? InstallTime { get; private set; }
 
-        internal BuildInfo WithCompilationOptions(CompilationOptions options)
-        {
-            CompilationOptions = options;
-            return this;
-        }
-
         internal BuildInfo WithInstallTime(DateTime? installTime)
         {
             InstallTime = installTime;
             return this;
         }
+    }
+
+    class BuildInfoComparer : IEqualityComparer<BuildInfo>
+    {
+        public static IEqualityComparer<BuildInfo> Default { get; } = new BuildInfoComparer();
+
+        public bool Equals(BuildInfo x, BuildInfo y) => x.EquivalenceKey == y.EquivalenceKey;
+        public int GetHashCode(BuildInfo obj) => obj.EquivalenceKey;
+    }
+
+    class DiagnosticComparer : IEqualityComparer<Diagnostic?>
+    {
+        public bool Equals(Diagnostic? x, Diagnostic? y) => x?.Id == y?.Id;
+        public int GetHashCode(Diagnostic? obj) => obj?.Id.GetHashCode() ?? 0;
     }
 }
