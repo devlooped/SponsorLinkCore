@@ -1,7 +1,7 @@
 [file ".editorconfig"]
 	url = https://github.com/devlooped/oss/blob/main/.editorconfig
-	sha = 448cf45a26e068fe5d7164ea48d1dc8bf620df46
-	etag = 897634b9ba05c00e8ef35b24533d31bc43a5299be5a64e240109ba4c00fcad15
+	sha = 29818360755cdb9ba5527013a2ecc9670c437e44
+	etag = f0b411ee5aa5ddb4449d98ad73fe11c921589b8d26e4f4527d58e26d39f03958
 	weak
 [file ".gitattributes"]
 	url = https://github.com/devlooped/oss/blob/main/.gitattributes
